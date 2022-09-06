@@ -23,6 +23,14 @@ ensure = function(package, repo = 'http://cran.rstudio.com', load = FALSE) {
     library(package, character.only = TRUE)
   }
 }
+ensure_gh = function(repo, load = FALSE) {
+  if (!(package %in% rownames(installed.packages()))) {
+    devtools::install_github(repo = repo, lib = applibpath)
+  }
+  if (load) {
+    library(package, character.only = TRUE)
+  }
+}
 
 # read the application config
 ensure('jsonlite', load = TRUE)
@@ -45,14 +53,27 @@ appexit_msg = tryCatch({
     col.names='package',
     as.is = TRUE
   )$package
+  
+  github_packages = read.table(
+    file.path(appwd, 'app', 'git_packages.txt'),
+    col.names=c('repo','package'),
+    as.is = TRUE
+  )$repo
 
   message('ensuring packages: ', paste(packages, collapse = ', '))
   setWinProgressBar(pb, 0, label = 'Ensuring package dependencies ...')
   ._ = lapply(packages, ensure, repo = config$packages$cran)
+  ._ = lapply(github_packages, ensure_gh)
 
   for (i in seq_along(packages)) {
     setWinProgressBar(pb, i/(length(packages)+1), label = sprintf('Loading package-%s', packages[i]))
     library(packages[i], character.only = TRUE)
+  }
+  
+  for (i in seq_along(github_packages)) {
+    setWinProgressBar(pb, i/(length(github_packages)+1), label = sprintf('Loading package-%s', github_packages[i]))
+    git_pack=sub('(.*)/(.*)', '\\2', github_packages[i])
+    library(git_pack, character.only = TRUE)
   }
 
   setWinProgressBar(pb, 1.00, label = 'Starting application')
